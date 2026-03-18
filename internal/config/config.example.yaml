@@ -4,6 +4,7 @@ server:
   read_timeout: 30s
   write_timeout: 30s
   ssl: false
+  mode: "debug" # Required [debug, release, test]
   jwt_secret_key: "your_super_secret_jwt_key"
 
 write_db:
@@ -37,7 +38,9 @@ redis:
   host: "localhost"
   port: 6379
   password: ""
-  db: 0
+  auth_db: 0
+  cache_db: 1
+  limiter_db: 2
 
 mail:
   host: "smtp.example.com"

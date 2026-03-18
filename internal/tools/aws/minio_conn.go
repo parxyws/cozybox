@@ -10,29 +10,24 @@ import (
 	"github.com/parxyws/cozybox/internal/config"
 )
 
-// Global MinIO Client instance
-var MinioClient *minio.Client
-
 // InitMinio initializes a global AWS S3 / MinIO client
-func InitMinio(cfg *config.Config) error {
-	var err error
-
+func InitMinio(cfg *config.Config) (*minio.Client, error) {
 	// 1. MinIO Initialization
-	MinioClient, err = minio.New(cfg.AWS.Endpoint, &minio.Options{
+	minioClient, err := minio.New(cfg.AWS.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AWS.MinioAccessKey, cfg.AWS.MinioSecretKey, ""),
 		Secure: cfg.AWS.UseSSL,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create minio client: %w", err)
+		return nil, fmt.Errorf("failed to create minio client: %w", err)
 	}
 
 	// 2. Verification Ping (Optional, but best practice during setup)
 	// We can check connectivity by listing buckets or using a simple health check
-	_, err = MinioClient.ListBuckets(context.Background())
+	_, err = minioClient.ListBuckets(context.Background())
 	if err != nil {
 		// Log the warning but don't strictly crash the app if the internet is just down momentarily
 		log.Printf("warning: created MinIO client but failed to ping server: %v", err)
 	}
 
-	return nil
+	return minioClient, nil
 }

@@ -27,6 +27,7 @@ type ServerConfig struct {
 	ReadTimeout  time.Duration `mapstructure:"read_timeout" validate:"required"`
 	WriteTimeout time.Duration `mapstructure:"write_timeout" validate:"required"`
 	SSL          bool          `mapstructure:"ssl"`
+	Mode         string        `mapstructure:"mode" validate:"required,oneof=debug release test"`
 	JWTSecretKey string        `mapstructure:"jwt_secret_key" validate:"required"`
 }
 
@@ -62,10 +63,12 @@ type AwsConfig struct {
 }
 
 type RedisConfig struct {
-	Host     string `mapstructure:"host" validate:"required"`
-	Port     int    `mapstructure:"port" validate:"required,min=1,max=65535"`
-	Password string `mapstructure:"password"`
-	Db       int    `mapstructure:"db" validate:"min=0"`
+	Host      string `mapstructure:"host" validate:"required"`
+	Port      int    `mapstructure:"port" validate:"required,min=1,max=65535"`
+	Password  string `mapstructure:"password"`
+	AuthDB    int    `mapstructure:"auth_db" validate:"min=0"`
+	CacheDB   int    `mapstructure:"cache_db" validate:"min=0"`
+	LimiterDB int    `mapstructure:"limiter_db" validate:"min=0"`
 }
 
 type MailConfig struct {
