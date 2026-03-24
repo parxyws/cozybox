@@ -40,8 +40,12 @@ type UpdatePasswordRequest struct {
 }
 
 type UpdateEmailRequest struct {
-	CurrentPassword string `json:"current_password" validate:"required,min=8,max=128"`
-	NewEmail        string `json:"new_email"        validate:"required,email"`
+	NewEmail string `json:"new_email"        validate:"required,email"`
+}
+
+type CommitUpdateEmailRequest struct {
+	ReferenceId string `json:"reference_id" validate:"required"`
+	Otp         string `json:"otp"          validate:"required,len=6,numeric"`
 }
 
 type DeleteAccountRequest struct {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/parxyws/cozybox/internal/dto"
 	"github.com/parxyws/cozybox/internal/models"
-	"github.com/parxyws/cozybox/internal/tools/jwt"
+	"github.com/parxyws/cozybox/internal/tools/contextkey"
 	"github.com/parxyws/cozybox/internal/tools/mail"
 	"github.com/parxyws/cozybox/internal/tools/util"
 	"github.com/redis/go-redis/v9"
@@ -24,17 +25,17 @@ type UserService struct {
 	db      *gorm.DB
 	mailer  *mail.Mailer
 	authRds *redis.Client
-	jwt     jwt.TokenMaker
+	jwt     util.TokenMaker
 }
 
 const (
 	OTP_LENGTH = 6
-	OTP_EXPIRY = 5 * time.Minute
+	OTP_EXPIRY = 2 * time.Minute
 )
 
 type UserServiceInterface interface{}
 
-func NewUserService(db *gorm.DB, mailer *mail.Mailer, authRds *redis.Client, jwt jwt.TokenMaker) *UserService {
+func NewUserService(db *gorm.DB, mailer *mail.Mailer, authRds *redis.Client, jwt util.TokenMaker) *UserService {
 	return &UserService{db: db, mailer: mailer, authRds: authRds, jwt: jwt}
 }
 
@@ -59,11 +60,7 @@ func (u *UserService) Register(ctx context.Context, req *dto.RegisterUserRequest
 	}
 
 	tx := u.db.WithContext(ctx).Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
+	defer tx.Rollback()
 
 	res := tx.Where("email = ? AND deleted_at IS NULL", req.Email).FirstOrCreate(request)
 	if res.Error != nil {
@@ -75,7 +72,6 @@ func (u *UserService) Register(ctx context.Context, req *dto.RegisterUserRequest
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -105,8 +101,7 @@ func (u *UserService) Register(ctx context.Context, req *dto.RegisterUserRequest
 
 	// TODO: send email verification
 	go func() {
-		err := u.mailer.SendOTP(request.Email, "Verify Your Email", fmt.Sprintf("Please verify your email address %s", otp))
-		if err != nil {
+		if err := u.mailer.SendOTP(request.Email, "Verify Your Email", fmt.Sprintf("Please verify your email address %s", otp)); err != nil {
 			fmt.Printf("failed to send otp to %s: %v", request.Email, err)
 		}
 	}()
@@ -117,20 +112,24 @@ func (u *UserService) Register(ctx context.Context, req *dto.RegisterUserRequest
 }
 
 func (u *UserService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.VerifyEmailResponse, error) {
-	referenceId := strings.TrimSpace(req.ReferenceId)
+	trimmedReferenceID := strings.TrimSpace(req.ReferenceId)
 
-	otp, err := u.authRds.Get(ctx, fmt.Sprintf("otp-%s", referenceId)).Result()
-	if err == redis.Nil {
-		return nil, errors.New("otp not found")
-	} else if err != nil {
-		return nil, errors.New("failed to check otp mapping")
+	// otp, err := u.authRds.Get(ctx, fmt.Sprintf("otp-%s", referenceId)).Result()
+	// if err == redis.Nil {
+	// 	return nil, errors.New("otp not found")
+	// } else if err != nil {
+	// 	return nil, errors.New("failed to check otp mapping")
+	// }
+
+	// if otp != req.Otp {
+	// 	return nil, errors.New("otp not match")
+	// }
+
+	if err := u.verifyOTP(ctx, trimmedReferenceID, req.Otp); err != nil {
+		return nil, err
 	}
 
-	if otp != req.Otp {
-		return nil, errors.New("otp not match")
-	}
-
-	data, err := u.authRds.Get(ctx, fmt.Sprintf("ref-%s", referenceId)).Result()
+	data, err := u.authRds.Get(ctx, fmt.Sprintf("ref-%s", trimmedReferenceID)).Result()
 	if err == redis.Nil {
 		return nil, errors.New("reference id not found")
 	} else if err != nil {
@@ -145,11 +144,7 @@ func (u *UserService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 
 	var userModel models.User
 	tx := u.db.WithContext(ctx).Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
+	defer tx.Rollback()
 	res := tx.Where("id = ? AND deleted_at IS NULL", user.Id).First(&userModel)
 	if res.Error != nil {
 		return nil, fmt.Errorf("failed to get user: %w", res.Error)
@@ -167,12 +162,11 @@ func (u *UserService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return &dto.VerifyEmailResponse{
-		ReferenceId: referenceId,
+		ReferenceId: trimmedReferenceID,
 	}, nil
 }
 
@@ -180,11 +174,7 @@ func (u *UserService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Us
 	var userModel models.User
 
 	tx := u.db.WithContext(ctx).Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
+	defer tx.Rollback()
 
 	res := tx.Where("email = ? AND deleted_at IS NULL", req.Email).First(&userModel)
 	if res.Error != nil {
@@ -245,7 +235,6 @@ func (u *UserService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Us
 		return nil, fmt.Errorf("failed to save user: %w", err)
 	}
 	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
 
@@ -358,7 +347,7 @@ func (u *UserService) Logout(ctx context.Context, sessionID string) error {
 
 func (u *UserService) GetProfile(ctx context.Context) (*dto.UserResponse, error) {
 	var userModel models.User
-	id := ctx.Value("user_id").(string)
+	id := ctx.Value(contextkey.UserID).(string)
 	if err := u.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&userModel).Error; err != nil {
 		return nil, errors.New("user not found")
 	}
@@ -371,17 +360,216 @@ func (u *UserService) GetProfile(ctx context.Context) (*dto.UserResponse, error)
 }
 
 func (u *UserService) UpdateProfile(ctx context.Context, req *dto.UpdateProfileRequest) (*dto.UserResponse, error) {
-	return nil, nil
+	id := ctx.Value(contextkey.UserID).(string)
+	currentTime := time.Now()
+
+	var request *models.User
+	tx := u.db.WithContext(ctx).Begin()
+	defer tx.Rollback()
+
+	if err := tx.Where("id = ? AND deleted_at IS NULL", id).First(&request).Error; err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	request.Name = req.Name
+	request.UpdatedAt = currentTime
+
+	if err := tx.Updates(&request).Error; err != nil {
+		return nil, errors.New("failed to update user")
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, errors.New("failed to commit")
+	}
+
+	return &dto.UserResponse{
+		Id:       request.Id,
+		Name:     request.Name,
+		Username: request.Username,
+		Email:    request.Email,
+	}, nil
+
 }
 
 func (u *UserService) UpdatePassword(ctx context.Context, req *dto.UpdatePasswordRequest) (*dto.UserResponse, error) {
-	return nil, nil
+	currentTime := time.Now()
+	id := ctx.Value(contextkey.UserID).(string)
+	tx := u.db.WithContext(ctx).Begin()
+	defer tx.Rollback()
+
+	var userModel models.User
+	if err := tx.Where("id = ? AND deleted_at IS NULL", id).First(&userModel).Error; err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(userModel.Password), []byte(req.CurrentPassword)); err != nil {
+		return nil, errors.New("invalid current password")
+	}
+
+	newhasedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, errors.New("failed to hash password")
+	}
+
+	userModel.Password = string(newhasedPassword)
+	userModel.UpdatedAt = currentTime
+
+	if err := tx.Updates(&userModel).Error; err != nil {
+		return nil, errors.New("failed to update password")
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, errors.New("failed to commit")
+	}
+
+	return &dto.UserResponse{
+		Id:       userModel.Id,
+		Name:     userModel.Name,
+		Username: userModel.Username,
+		Email:    userModel.Email,
+	}, nil
+
 }
 
-func (u *UserService) UpdateEmail(ctx context.Context, req *dto.UpdateEmailRequest) (*dto.UserResponse, error) {
-	return nil, nil
+func (u *UserService) UpdateEmail(ctx context.Context, req *dto.UpdateEmailRequest) (*dto.UpdateEmailResponse, error) {
+	id := ctx.Value(contextkey.UserID).(string)
+	identifier := base64.StdEncoding.EncodeToString([]byte(id))
+	referenceId := fmt.Sprintf("%s-%s", identifier, ulid.Make().String())
+
+	var count int64
+	if err := u.db.WithContext(ctx).Where("email = ? AND deleted_at IS NULL", req.NewEmail).Count(&count).Error; err != nil {
+		return nil, errors.New("failed to check email")
+	}
+
+	if count > 0 {
+		return nil, errors.New("email already exists")
+	}
+
+	otp, err := util.GenerateRandomInteger(OTP_LENGTH)
+	if err != nil {
+		return nil, errors.New("failed to generate otp")
+	}
+
+	data := map[string]interface{}{
+		"user_id": id,
+		"email":   req.NewEmail,
+	}
+
+	marshaledData, err := json.Marshal(data)
+	if err != nil {
+		return nil, errors.New("failed to marshal user payload")
+	}
+
+	pipe := u.authRds.Pipeline()
+	pipe.Set(ctx, fmt.Sprintf("ref-%s", referenceId), marshaledData, OTP_EXPIRY)
+	pipe.Set(ctx, fmt.Sprintf("otp-%s", referenceId), otp, OTP_EXPIRY)
+	if _, err = pipe.Exec(ctx); err != nil {
+		return nil, fmt.Errorf("failed to store registration data: %w", err)
+	}
+
+	go func() {
+		if err := u.mailer.SendOTP(req.NewEmail, "Update Email", fmt.Sprintf("Please verify your email address %s", otp)); err != nil {
+			fmt.Printf("failed to send otp to %s: %v", req.NewEmail, err)
+		}
+	}()
+
+	return &dto.UpdateEmailResponse{ReferenceId: referenceId}, nil
+}
+
+func (u *UserService) CommitUpdateEmail(ctx context.Context, req *dto.CommitUpdateEmailRequest) (*dto.UserResponse, error) {
+	id := ctx.Value(contextkey.UserID).(string)
+
+	if err := u.verifyOTP(ctx, req.ReferenceId, req.Otp); err != nil {
+		return nil, err
+	}
+
+	var data map[string]interface{}
+	if err := u.authRds.Get(ctx, fmt.Sprintf("ref-%s", req.ReferenceId)).Scan(&data); err != nil {
+		return nil, errors.New("failed to get user data")
+	}
+
+	if data["user_id"].(string) != id {
+		return nil, errors.New("user not found")
+	}
+
+	tx := u.db.WithContext(ctx).Begin()
+	defer tx.Rollback()
+
+	var userModel models.User
+	if err := tx.Where("id = ? AND deleted_at IS NULL", id).First(&userModel).Error; err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	userModel.Email = data["email"].(string)
+	userModel.UpdatedAt = time.Now()
+
+	if err := tx.Updates(&userModel).Error; err != nil {
+		return nil, errors.New("failed to update user")
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, errors.New("failed to commit update")
+	}
+
+	if err := u.authRds.Del(ctx, fmt.Sprintf("ref-%s", req.ReferenceId)).Err(); err != nil {
+		return nil, errors.New("failed to delete ref")
+	}
+
+	return &dto.UserResponse{
+		Id:       userModel.Id,
+		Name:     userModel.Name,
+		Username: userModel.Username,
+		Email:    userModel.Email,
+	}, nil
 }
 
 func (u *UserService) DeleteAccount(ctx context.Context, req *dto.DeleteAccountRequest) error {
+	id := ctx.Value(contextkey.UserID).(string)
+	currentTime := time.Now()
+
+	tx := u.db.WithContext(ctx).Begin()
+	defer tx.Rollback()
+
+	var userModel models.User
+	if err := tx.Where("id = ? AND deleted_at IS NULL", id).First(&userModel).Error; err != nil {
+		return errors.New("user not found")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(userModel.Password), []byte(req.CurrentPassword)); err != nil {
+		return errors.New("invalid current password")
+	}
+
+	userModel.DeletedAt = sql.NullTime{Time: currentTime, Valid: true}
+
+	if err := tx.Updates(&userModel).Error; err != nil {
+		return errors.New("failed to delete user")
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return errors.New("failed to commit")
+	}
+
+	return nil
+}
+
+func (u *UserService) verifyOTP(ctx context.Context, reference string, otp string) error {
+	trimmedReference := strings.TrimSpace(reference)
+	trimmedOTP := strings.TrimSpace(otp)
+
+	otp, err := u.authRds.Get(ctx, fmt.Sprintf("otp-%s", trimmedReference)).Result()
+	if err == redis.Nil {
+		return errors.New("otp not found")
+	} else if err != nil {
+		return errors.New("failed to check otp mapping")
+	}
+
+	if otp != trimmedOTP {
+		return errors.New("otp not match")
+	}
+
+	if err := u.authRds.Del(ctx, fmt.Sprintf("otp-%s", trimmedReference)).Err(); err != nil {
+		return errors.New("failed to delete otp")
+	}
+
 	return nil
 }

@@ -1,0 +1,34 @@
+package models
+
+import (
+	"database/sql"
+	"time"
+)
+
+type Organization struct {
+	Id              string       `json:"id" gorm:"column:id;primaryKey"`
+	OwnerId         string       `json:"owner_id" gorm:"column:owner_id"`
+	Name            string       `json:"name" gorm:"column:name"`
+	Email           string       `json:"email" gorm:"column:email"`
+	Phone           string       `json:"phone" gorm:"column:phone"`
+	AddressLine1    string       `json:"address_line1" gorm:"column:address_line1"`
+	AddressLine2    string       `json:"address_line2" gorm:"column:address_line2"`
+	City            string       `json:"city" gorm:"column:city"`
+	State           string       `json:"state" gorm:"column:state"`
+	PostalCode      string       `json:"postal_code" gorm:"column:postal_code"`
+	Country         string       `json:"country" gorm:"column:country"`
+	TaxId           string       `json:"tax_id" gorm:"column:tax_id"`
+	LogoUrl         string       `json:"logo_url" gorm:"column:logo_url"`
+	DefaultCurrency string       `json:"default_currency" gorm:"column:default_currency;default:USD"`
+	CreatedAt       time.Time    `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt       time.Time    `json:"updated_at" gorm:"column:updated_at"`
+	DeletedAt       sql.NullTime `json:"deleted_at" gorm:"column:deleted_at"`
+
+	// Relations
+	Owner    User      `json:"owner" gorm:"foreignKey:OwnerId;references:Id"`
+	Contacts []Contact `json:"contacts" gorm:"foreignKey:OrganizationId;references:Id"`
+}
+
+func (o Organization) TableName() string {
+	return "organizations"
+}

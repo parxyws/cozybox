@@ -1,4 +1,4 @@
-package jwt
+package util
 
 import (
 	"crypto/rand"
@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	golangjwt "github.com/golang-jwt/jwt/v5"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 const (
@@ -26,7 +26,7 @@ type JWTMaker struct {
 type CustomClaims struct {
 	UserID    string `json:"user_id"`
 	SessionID string `json:"session_id"`
-	golangjwt.RegisteredClaims
+	jwt.RegisteredClaims
 }
 
 func NewJWTMaker(secretKey string) (TokenMaker, error) {
@@ -42,36 +42,36 @@ func (maker *JWTMaker) CreateAccessToken(userID string, sessionID string, durati
 	claims := CustomClaims{
 		UserID:    userID,
 		SessionID: sessionID,
-		RegisteredClaims: golangjwt.RegisteredClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    ISS,
 			Subject:   userID,
 			Audience:  []string{"cozybox-api"},
-			ExpiresAt: golangjwt.NewNumericDate(time.Now().Add(duration)),
-			NotBefore: golangjwt.NewNumericDate(time.Now()),
-			IssuedAt:  golangjwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ID:        sessionID,
 		},
 	}
 
-	jwtToken := golangjwt.NewWithClaims(golangjwt.SigningMethodHS256, claims)
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return jwtToken.SignedString(maker.secretKey)
 }
 
 func (maker *JWTMaker) VerifyAccessToken(token string) (*CustomClaims, error) {
-	keyFunc := func(token *golangjwt.Token) (interface{}, error) {
-		_, ok := token.Method.(*golangjwt.SigningMethodHMAC)
+	keyFunc := func(token *jwt.Token) (interface{}, error) {
+		_, ok := token.Method.(*jwt.SigningMethodHMAC)
 		if !ok {
 			return nil, errors.New("invalid authentication token marker")
 		}
 		return maker.secretKey, nil
 	}
 
-	jwtToken, err := golangjwt.ParseWithClaims(token, &CustomClaims{}, keyFunc,
-		golangjwt.WithLeeway(5*time.Second),
-		golangjwt.WithIssuer(ISS),
-		golangjwt.WithAudience("cozybox-api"),
-		golangjwt.WithValidMethods([]string{golangjwt.SigningMethodHS256.Alg()}),
-		golangjwt.WithExpirationRequired(),
+	jwtToken, err := jwt.ParseWithClaims(token, &CustomClaims{}, keyFunc,
+		jwt.WithLeeway(5*time.Second),
+		jwt.WithIssuer(ISS),
+		jwt.WithAudience("cozybox-api"),
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
 		return nil, err

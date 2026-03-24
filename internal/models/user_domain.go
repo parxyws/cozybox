@@ -18,6 +18,6 @@ type User struct {
 	DeletedAt  sql.NullTime `json:"deleted_at" gorm:"column:deleted_at"`
 }
 
-func (u User) TableName() string {
+func (u *User) TableName() string {
 	return "users"
 }

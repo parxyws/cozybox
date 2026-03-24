@@ -21,3 +21,10 @@ type UserAutheticateResponse struct {
 	TokenType    string       `json:"token_type"`
 	User         UserResponse `json:"user"`
 }
+
+type UpdateEmailResponse struct {
+	ReferenceId string `json:"reference_id"`
+}
+
+type CommitUpdateResponse struct {
+}
