@@ -18,22 +18,22 @@ import (
 	"github.com/parxyws/cozybox/internal/tools/pdf/components"
 )
 
-type InvoiceRenderer struct {
+type QuotationRenderer struct {
 	cfg *entity.Config
 }
 
-func NewInvoiceRenderer(cfg *entity.Config) *InvoiceRenderer {
-	return &InvoiceRenderer{cfg: cfg}
+func NewQuotationRenderer(cfg *entity.Config) *QuotationRenderer {
+	return &QuotationRenderer{cfg: cfg}
 }
 
-func (r *InvoiceRenderer) Render(doc *models.Document) ([]byte, error) {
-	m := maroto.New(r.cfg)
+func (q *QuotationRenderer) Render(doc *models.Document) ([]byte, error) {
+	m := maroto.New(q.cfg)
 
 	m.RegisterHeader(components.BuildHeader()...)
 	m.RegisterFooter(components.BuildFooter())
 
-	m.AddRows(r.buildInvoiceProfileSection(doc)...)
-	m.AddRows(r.buildInvoiceContentSection(doc.Items)...)
+	m.AddRows(q.buildQuotationProfileSection(doc)...)
+	m.AddRows(q.buildQuotationContentSection(doc.Items)...)
 
 	document, err := m.Generate()
 	if err != nil {
@@ -43,7 +43,7 @@ func (r *InvoiceRenderer) Render(doc *models.Document) ([]byte, error) {
 	return document.GetBytes(), nil
 }
 
-func (r *InvoiceRenderer) buildInvoiceProfileSection(doc *models.Document) []core.Row {
+func (q *QuotationRenderer) buildQuotationProfileSection(doc *models.Document) []core.Row {
 	padding := 2.0
 
 	lblTop := props.Text{Style: fontstyle.Bold, Align: align.Left, Size: 8, Top: padding, Left: padding}
@@ -57,61 +57,42 @@ func (r *InvoiceRenderer) buildInvoiceProfileSection(doc *models.Document) []cor
 
 	sep := props.Line{Orientation: orientation.Vertical, Thickness: 0.2, SizePercent: 100, OffsetPercent: 100}
 
-	color := &props.Color{Red: 244, Green: 208, Blue: 111}
+	color := &props.Color{Red: 173, Green: 181, Blue: 189}
 
 	return []core.Row{
 		// Title
 		row.New(0).WithStyle(&props.Cell{BorderType: border.Top | border.Left | border.Right, BorderThickness: 0.2, BackgroundColor: color}).Add(
-			text.NewCol(12, "INVOICE", props.Text{Style: fontstyle.Bold, Size: 12, Align: align.Center, Bottom: padding + 1, Top: padding}),
+			text.NewCol(12, "QUOTATION: PT. TOYOTA MOTOR MANUFACTURING INDONESIA", props.Text{Style: fontstyle.Bold, Size: 12, Align: align.Center, Bottom: padding + 1, Top: padding}),
 		),
-
-		// row.New(0).Add(
-		// 	text.NewCol(6, "INVOICE NO: PBMD/EXT-COM/2218/VII/2025", props.Text{Style: fontstyle.Bold, Align: align.Center, Size: 8, Top: 2, Bottom: 2}).WithStyle(&props.Cell{
-		// 		BorderType:      border.Full,
-		// 		BorderThickness: 0.2,
-		// 	}),
-		// 	text.NewCol(6, "REFERENCE NO: PBMD/EXT-COM/2218/VII/2025", props.Text{Style: fontstyle.Bold, Align: align.Center, Size: 8, Top: 2, Bottom: 2}).WithStyle(&props.Cell{
-		// 		BorderType:      border.Full,
-		// 		BorderThickness: 0.2,
-		// 	}),
-		// ),
 
 		// Row 1
 		row.New(0).WithStyle(&props.Cell{BorderType: border.Top | border.Left | border.Right, BorderThickness: 0.2}).Add(
-			text.NewCol(2, "Bill To", lblTop),
+			text.NewCol(2, "To", lblTop),
 			text.NewCol(4, ": Perkakas Rekadaya Nusantara", valTop),
 			line.NewCol(1, sep),
-			text.NewCol(2, "Invoice No", lblTop),
-			text.NewCol(3, ": PBMD/EXT-COM/2218/VII/2025", valTop),
+			text.NewCol(2, "Phone", lblTop),
+			text.NewCol(3, ": 62-21-6515551 Ext. 61909", valTop),
 		),
 		// Row 2
 		row.New(0).WithStyle(&props.Cell{BorderType: border.Left | border.Right, BorderThickness: 0.2}).Add(
 			text.NewCol(2, "Attn.", lblMid),
 			text.NewCol(4, ": Mr. Agustian Sabar L", valMid),
 			line.NewCol(1, sep),
-			text.NewCol(2, "Issue Date", lblMid),
-			text.NewCol(3, ": 28 July 2025", valMid),
+			text.NewCol(2, "Ref. No.", lblMid),
+			text.NewCol(3, ": PBMD/EXT-COM/2218/VII/2025", valMid),
 		),
 		// Row 3
-		row.New(0).WithStyle(&props.Cell{BorderType: border.Left | border.Right, BorderThickness: 0.2}).Add(
-			text.NewCol(2, "Phone", lblMid),
-			text.NewCol(4, ": 62-21-6515551 Ext. 61909", valMid),
-			line.NewCol(1, sep),
-			text.NewCol(2, "Due Date", lblMid),
-			text.NewCol(3, ": 28 July 2025", valMid),
-		),
-
 		row.New(0).WithStyle(&props.Cell{BorderType: border.Left | border.Right | border.Bottom, BorderThickness: 0.2}).Add(
-			text.NewCol(2, "", lblBot),
-			text.NewCol(4, "", valBot),
+			text.NewCol(2, "Cc", lblBot),
+			text.NewCol(4, ": Mr. Afdely Sidqy", valBot),
 			line.NewCol(1, sep),
-			text.NewCol(2, "Pre-Order No", lblBot),
-			text.NewCol(3, ": PO/123456789", valBot),
+			text.NewCol(2, "Issued Date", lblBot),
+			text.NewCol(3, ": 28 July 2025", valBot),
 		),
 	}
 }
 
-func (r *InvoiceRenderer) buildInvoiceContentSection(items []models.DocumentItem) []core.Row {
+func (q *QuotationRenderer) buildQuotationContentSection(items []models.DocumentItem) []core.Row {
 	var rows []core.Row
 
 	// Initial top spacing
@@ -125,7 +106,7 @@ func (r *InvoiceRenderer) buildInvoiceContentSection(items []models.DocumentItem
 	valLeft := props.Text{Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}
 	// valRight := props.Text{Align: align.Right, Size: 8, Top: 2, Bottom: 2, Right: 2}
 
-	color := &props.Color{Red: 244, Green: 208, Blue: 111}
+	color := &props.Color{Red: 173, Green: 181, Blue: 189}
 
 	// Cell border styles for the table
 	hdrCell := &props.Cell{
@@ -181,48 +162,52 @@ func (r *InvoiceRenderer) buildInvoiceContentSection(items []models.DocumentItem
 	rows = append(rows, row.New(0).Add(
 		text.NewCol(8, "", props.Text{Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}),
 		text.NewCol(2, "Total", props.Text{Style: fontstyle.Bold, Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}).WithStyle(summaryCell),
-		text.NewCol(2, "Rp 111.000.000", props.Text{Style: fontstyle.Bold, Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}).WithStyle(summaryCellRight),
+		text.NewCol(2, "Rp 111.000.000", props.Text{Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}).WithStyle(summaryCellRight),
 	))
 
+	// Styles for NOTE and TERMS bounding boxes
 	outerTop := &props.Cell{BorderType: border.Full, BorderThickness: 0.2, BackgroundColor: color}
 	outerMid := &props.Cell{BorderType: border.Left | border.Right, BorderThickness: 0.2}
 	outerBot := &props.Cell{BorderType: border.Left | border.Right | border.Bottom, BorderThickness: 0.2}
 
+	// NOTE Section
 	rows = append(rows, row.New(5))
 
 	rows = append(rows, row.New(0).WithStyle(outerTop).Add(
-		text.NewCol(12, "PAYMENT INSTRUCTIONS", props.Text{Style: fontstyle.Bold, Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}),
+		text.NewCol(12, "NOTE", props.Text{Style: fontstyle.Bold, Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}),
 	))
 	rows = append(rows, row.New(0).WithStyle(outerMid).Add(
-		text.NewCol(2, "Bank", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
-		text.NewCol(10, ": Bank Central Asia (BCA)", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
+		text.NewCol(12, "A. ", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
 	))
 	rows = append(rows, row.New(0).WithStyle(outerMid).Add(
-		text.NewCol(2, "Account Name", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
-		text.NewCol(10, ": PT. Cozybox Jaya Abadi", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
+		text.NewCol(12, "B. ", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
 	))
 	rows = append(rows, row.New(0).WithStyle(outerMid).Add(
-		text.NewCol(2, "Account Number", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
-		text.NewCol(10, ": 1234567890", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
+		text.NewCol(12, "C. ", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
+	))
+	rows = append(rows, row.New(0).WithStyle(outerMid).Add(
+		text.NewCol(12, "D. ", props.Text{Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}),
 	))
 	rows = append(rows, row.New(0).WithStyle(outerBot).Add(
-		text.NewCol(2, "Reference", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
-		text.NewCol(10, ": Please include invoice number PBMD/EXT-COM/2218/VII/2025 in your transfer.", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2, Bottom: 2}),
+		text.NewCol(12, " ", props.Text{Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}),
 	))
 
-	// Payment Terms & Instructions Section
+	// TERMS AND CONDITIONS Section
 	rows = append(rows, row.New(5))
 	rows = append(rows, row.New(0).WithStyle(outerTop).Add(
-		text.NewCol(12, "TERMS", props.Text{Style: fontstyle.Bold, Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}),
+		text.NewCol(12, "TERMS AND CONDITIONS", props.Text{Style: fontstyle.Bold, Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}),
 	))
 	rows = append(rows, row.New(0).WithStyle(outerMid).Add(
-		text.NewCol(12, "1. Payment is due strictly within 14 days from the invoice date.", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
+		text.NewCol(12, "1. This quotation is valid for 30 days from the date of issue.", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
 	))
 	rows = append(rows, row.New(0).WithStyle(outerMid).Add(
-		text.NewCol(12, "2. Overdue payments may be subject to a 2% monthly late penalty fee.", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
+		text.NewCol(12, "2. Payment is required in full within 14 days of invoice receipt.", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
+	))
+	rows = append(rows, row.New(0).WithStyle(outerMid).Add(
+		text.NewCol(12, "3. All prices are strictly exclusive of VAT and additional taxes.", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2}),
 	))
 	rows = append(rows, row.New(0).WithStyle(outerBot).Add(
-		text.NewCol(12, "3. Any discrepancies regarding goods or services must be reported within 7 days.", props.Text{Align: align.Left, Size: 8, Top: 2, Left: 2, Bottom: 2}),
+		text.NewCol(12, "4. Execution of services will commence upon receipt of a signed approval or PO.", props.Text{Align: align.Left, Size: 8, Top: 2, Bottom: 2, Left: 2}),
 	))
 
 	return rows

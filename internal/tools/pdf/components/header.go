@@ -18,21 +18,24 @@ func BuildHeader() []core.Row {
 				text.New("COZYBOX", props.Text{Style: fontstyle.Bold, Size: 24}),
 			),
 		),
+		row.New(2).Add(col.New(12)),
 		// Row 2: Line separator
-		row.New(3).Add(
+		row.New(1).Add(
 			col.New(12).Add(
-				line.New(props.Line{SizePercent: 100}),
+				line.New(props.Line{SizePercent: 100, Thickness: 0.5}),
 			),
 		),
 		// Row 3: Address details
 		row.New(20).Add(
 			col.New(12).Add(
-				text.New("PT Cozybox Jaya Abadi", props.Text{Size: 12, Style: fontstyle.Bold}),
-				text.New("Jl. Raya Bogor KM 25 No. 123", props.Text{Size: 8, Top: 6}),
-				text.New("Jakarta, Indonesia 12345", props.Text{Size: 8, Top: 10}),
-				text.New("Tel: 123-456-7890 | Email: admin@cozybox.com", props.Text{Size: 8, Top: 14}),
-				text.New("www.cozybox.com", props.Text{Size: 8, Top: 18}),
+				text.New("PT Cozybox Jaya Abadi", props.Text{Size: 10, Style: fontstyle.Bold}),
+				text.New("Jl. Raya Bogor KM 25 No. 123", props.Text{Size: 8, Top: 4}),
+				text.New("Jakarta, Indonesia 12345", props.Text{Size: 8, Top: 7}),
+				text.New("Tel: 123-456-7890 | Email: admin@cozybox.com", props.Text{Size: 8, Top: 10}),
+				text.New("www.cozybox.com", props.Text{Size: 8, Top: 13}),
 			),
 		),
+
+		row.New(15),
 	}
 }

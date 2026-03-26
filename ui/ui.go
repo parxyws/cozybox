@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//go:embed dist
+//go:embed dist/*
 var staticFS embed.FS
 
 // AddRoutes serves the static file system for the UI React App.
