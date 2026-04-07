@@ -15,6 +15,7 @@ const (
 
 type Contact struct {
 	Id             string       `json:"id" gorm:"column:id;primaryKey"`
+	TenantId       string       `json:"tenant_id" gorm:"column:tenant_id;index"`
 	OrganizationId string       `json:"organization_id" gorm:"column:organization_id"`
 	Type           ContactType  `json:"type" gorm:"column:type"`
 	Name           string       `json:"name" gorm:"column:name"`

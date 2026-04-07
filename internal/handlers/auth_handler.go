@@ -20,9 +20,7 @@ func NewAuthHandler(userService *service.UserService) *AuthHandler {
 
 func (a *AuthHandler) Register(c *gin.Context) {
 	ctx, cancel := helper.GetContext(c)
-	defer func() {
-		cancel()
-	}()
+	defer cancel()
 
 	var req dto.RegisterUserRequest
 	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
@@ -41,14 +39,12 @@ func (a *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	helper.Success(c, http.StatusOK, "User registered successfully", result)
+	helper.Success(c, http.StatusCreated, "User registered successfully", result)
 }
 
 func (a *AuthHandler) VerifyEmail(c *gin.Context) {
 	ctx, cancel := helper.GetContext(c)
-	defer func() {
-		cancel()
-	}()
+	defer cancel()
 
 	var req dto.VerifyEmailRequest
 	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
@@ -70,7 +66,71 @@ func (a *AuthHandler) VerifyEmail(c *gin.Context) {
 	helper.Success(c, http.StatusOK, "User email verified successfully", result)
 }
 
-func (a *AuthHandler) Login(c *gin.Context) {}
+func (a *AuthHandler) Login(c *gin.Context) {
+	ctx, cancel := helper.GetContext(c)
+	defer cancel()
+
+	var req dto.LoginRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		helper.Error(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := validator.Validate.StructCtx(ctx, req); err != nil {
+		helper.Error(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	result, err := a.userService.Login(ctx, &req)
+	if err != nil {
+		helper.Error(c, http.StatusUnauthorized, "Login failed", err)
+		return
+	}
+
+	helper.Success(c, http.StatusOK, "Login successful", result)
+}
+
+func (a *AuthHandler) RefreshToken(c *gin.Context) {
+	ctx, cancel := helper.GetContext(c)
+	defer cancel()
+
+	var req dto.RefreshTokenRequest
+	if err := c.ShouldBindBodyWithJSON(&req); err != nil {
+		helper.Error(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := validator.Validate.StructCtx(ctx, req); err != nil {
+		helper.Error(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	result, err := a.userService.RefreshToken(ctx, &req)
+	if err != nil {
+		helper.Error(c, http.StatusUnauthorized, "Token refresh failed", err)
+		return
+	}
+
+	helper.Success(c, http.StatusOK, "Token refreshed successfully", result)
+}
+
+func (a *AuthHandler) Logout(c *gin.Context) {
+	ctx, cancel := helper.GetContext(c)
+	defer cancel()
+
+	sessionID, exists := c.Get("session_id")
+	if !exists {
+		helper.Error(c, http.StatusBadRequest, "Session not found", nil)
+		return
+	}
+
+	if err := a.userService.Logout(ctx, sessionID.(string)); err != nil {
+		helper.Error(c, http.StatusInternalServerError, "Logout failed", err)
+		return
+	}
+
+	helper.Success(c, http.StatusOK, "Logged out successfully", nil)
+}
 
 func (a *AuthHandler) ForgotPassword(c *gin.Context) {}
 

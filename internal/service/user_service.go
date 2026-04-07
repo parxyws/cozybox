@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -71,6 +72,36 @@ func (u *UserService) Register(ctx context.Context, req *dto.RegisterUserRequest
 		return nil, errors.New("user already exists")
 	}
 
+	// Create default tenant for the new user
+	tenantId := ulid.Make().String()
+	currentSlug := generateSlug(req.Name, tenantId)
+	tenant := &models.Tenant{
+		Id:        tenantId,
+		Name:      fmt.Sprintf("%s's Workspace", req.Name),
+		Slug:      currentSlug,
+		Status:    models.TenantStatusActive,
+		OwnerId:   request.Id,
+		CreatedAt: currentTime,
+		UpdatedAt: currentTime,
+	}
+
+	if err := tx.Create(tenant).Error; err != nil {
+		return nil, fmt.Errorf("failed to create tenant: %w", err)
+	}
+
+	// Add user as owner member of the tenant
+	member := &models.TenantMember{
+		Id:       ulid.Make().String(),
+		TenantId: tenant.Id,
+		UserId:   request.Id,
+		Role:     models.TenantRoleOwner,
+		JoinedAt: currentTime,
+	}
+
+	if err := tx.Create(member).Error; err != nil {
+		return nil, fmt.Errorf("failed to create tenant member: %w", err)
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -99,7 +130,6 @@ func (u *UserService) Register(ctx context.Context, req *dto.RegisterUserRequest
 		return nil, fmt.Errorf("failed to store registration data: %w", err)
 	}
 
-	// TODO: send email verification
 	go func() {
 		if err := u.mailer.SendOTP(request.Email, "Verify Your Email", fmt.Sprintf("Please verify your email address %s", otp)); err != nil {
 			fmt.Printf("failed to send otp to %s: %v", request.Email, err)
@@ -195,7 +225,16 @@ func (u *UserService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Us
 
 	sessionID := ulid.Make().String()
 
-	accessToken, err := u.jwt.CreateAccessToken(userModel.Id, sessionID, 15*time.Minute)
+	// Resolve the user's active tenant
+	var member models.TenantMember
+	if err := u.db.WithContext(ctx).
+		Where("user_id = ?", userModel.Id).
+		Preload("Tenant").
+		First(&member).Error; err != nil {
+		return nil, errors.New("no tenant found for user")
+	}
+
+	accessToken, err := u.jwt.CreateAccessToken(userModel.Id, member.TenantId, sessionID, 15*time.Minute)
 	if err != nil {
 		return nil, errors.New("failed to create access token")
 	}
@@ -214,6 +253,7 @@ func (u *UserService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Us
 	session := models.UserSession{
 		SessionID:    sessionID,
 		UserID:       userModel.Id,
+		TenantID:     member.TenantId,
 		RefreshToken: string(hashedRefreshToken),
 		ClientIP:     "",                                 // TODO: Get from context/request
 		UserAgent:    "",                                 // TODO: Get from context/request
@@ -247,6 +287,12 @@ func (u *UserService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Us
 			Name:     userModel.Name,
 			Username: userModel.Username,
 			Email:    userModel.Email,
+		},
+		Tenant: dto.TenantResponse{
+			Id:   member.TenantId,
+			Name: member.Tenant.Name,
+			Slug: member.Tenant.Slug,
+			Role: string(member.Role),
 		},
 	}, nil
 }
@@ -290,7 +336,7 @@ func (u *UserService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 	// Generate new session & tokens
 	newSessionID := ulid.Make().String()
 
-	newAccessToken, err := u.jwt.CreateAccessToken(userModel.Id, newSessionID, 15*time.Minute)
+	newAccessToken, err := u.jwt.CreateAccessToken(userModel.Id, session.TenantID, newSessionID, 15*time.Minute)
 	if err != nil {
 		return nil, errors.New("failed to create access token")
 	}
@@ -308,6 +354,7 @@ func (u *UserService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 	newSession := models.UserSession{
 		SessionID:    newSessionID,
 		UserID:       userModel.Id,
+		TenantID:     session.TenantID,
 		RefreshToken: string(hashedRefreshToken),
 		ClientIP:     session.ClientIP, // preserve original client info
 		UserAgent:    session.UserAgent,
@@ -334,6 +381,9 @@ func (u *UserService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 			Username: userModel.Username,
 			Email:    userModel.Email,
 		},
+		Tenant: dto.TenantResponse{
+			Id: session.TenantID,
+		},
 	}, nil
 }
 
@@ -347,7 +397,12 @@ func (u *UserService) Logout(ctx context.Context, sessionID string) error {
 
 func (u *UserService) GetProfile(ctx context.Context) (*dto.UserResponse, error) {
 	var userModel models.User
-	id := ctx.Value(contextkey.UserID).(string)
+
+	id, ok := ctx.Value(contextkey.UserID).(string)
+	if !ok || id == "" {
+		return nil, errors.New("unauthorized: user context missing")
+	}
+
 	if err := u.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&userModel).Error; err != nil {
 		return nil, errors.New("user not found")
 	}
@@ -360,7 +415,11 @@ func (u *UserService) GetProfile(ctx context.Context) (*dto.UserResponse, error)
 }
 
 func (u *UserService) UpdateProfile(ctx context.Context, req *dto.UpdateProfileRequest) (*dto.UserResponse, error) {
-	id := ctx.Value(contextkey.UserID).(string)
+	id, ok := ctx.Value(contextkey.UserID).(string)
+	if !ok || id == "" {
+		return nil, errors.New("unauthorized: user context missing")
+	}
+
 	currentTime := time.Now()
 
 	var request *models.User
@@ -393,7 +452,12 @@ func (u *UserService) UpdateProfile(ctx context.Context, req *dto.UpdateProfileR
 
 func (u *UserService) UpdatePassword(ctx context.Context, req *dto.UpdatePasswordRequest) (*dto.UserResponse, error) {
 	currentTime := time.Now()
-	id := ctx.Value(contextkey.UserID).(string)
+
+	id, ok := ctx.Value(contextkey.UserID).(string)
+	if !ok || id == "" {
+		return nil, errors.New("unauthorized: user context missing")
+	}
+
 	tx := u.db.WithContext(ctx).Begin()
 	defer tx.Rollback()
 
@@ -432,7 +496,11 @@ func (u *UserService) UpdatePassword(ctx context.Context, req *dto.UpdatePasswor
 }
 
 func (u *UserService) UpdateEmail(ctx context.Context, req *dto.UpdateEmailRequest) (*dto.UpdateEmailResponse, error) {
-	id := ctx.Value(contextkey.UserID).(string)
+	id, ok := ctx.Value(contextkey.UserID).(string)
+	if !ok || id == "" {
+		return nil, errors.New("unauthorized: user context missing")
+	}
+
 	identifier := base64.StdEncoding.EncodeToString([]byte(id))
 	referenceId := fmt.Sprintf("%s-%s", identifier, ulid.Make().String())
 
@@ -477,7 +545,10 @@ func (u *UserService) UpdateEmail(ctx context.Context, req *dto.UpdateEmailReque
 }
 
 func (u *UserService) CommitUpdateEmail(ctx context.Context, req *dto.CommitUpdateEmailRequest) (*dto.UserResponse, error) {
-	id := ctx.Value(contextkey.UserID).(string)
+	id, ok := ctx.Value(contextkey.UserID).(string)
+	if !ok || id == "" {
+		return nil, errors.New("unauthorized: user context missing")
+	}
 
 	if err := u.verifyOTP(ctx, req.ReferenceId, req.Otp); err != nil {
 		return nil, err
@@ -524,7 +595,11 @@ func (u *UserService) CommitUpdateEmail(ctx context.Context, req *dto.CommitUpda
 }
 
 func (u *UserService) DeleteAccount(ctx context.Context, req *dto.DeleteAccountRequest) error {
-	id := ctx.Value(contextkey.UserID).(string)
+	id, ok := ctx.Value(contextkey.UserID).(string)
+	if !ok || id == "" {
+		return errors.New("unauthorized: user context missing")
+	}
+
 	currentTime := time.Now()
 
 	tx := u.db.WithContext(ctx).Begin()
@@ -572,4 +647,20 @@ func (u *UserService) verifyOTP(ctx context.Context, reference string, otp strin
 	}
 
 	return nil
+}
+
+// generateSlug converts a name into a URL-safe slug using the tenant ID for uniqueness.
+// Example: "John Doe" with id "01JFXYZ123ABC" → "john-doe-01jfxyz1"
+func generateSlug(name string, id string) string {
+	slug := strings.ToLower(strings.TrimSpace(name))
+	// Replace non-alphanumeric characters with hyphens
+	re := regexp.MustCompile(`[^a-z0-9]+`)
+	slug = re.ReplaceAllString(slug, "-")
+	slug = strings.Trim(slug, "-")
+	if slug == "" {
+		slug = "workspace"
+	}
+	// Use the first 8 characters of the tenant ID as suffix
+	suffix := strings.ToLower(id[:8])
+	return fmt.Sprintf("%s-%s", slug, suffix)
 }

@@ -1,0 +1,122 @@
+### ==============================
+### CozyBox API — Test Routes
+### ==============================
+### Base URL
+@baseUrl = http://localhost:8080/api
+@contentType = application/json
+
+### Variables (fill after login)
+@accessToken = {{login.response.body.data.access_token}}
+@refreshToken = {{login.response.body.data.refresh_token}}
+@tenantId = {{login.response.body.data.tenant.id}}
+
+### ──────────────────────────────
+### AUTH — Public Routes
+### ──────────────────────────────
+
+### 1. Register a new user
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "name": "John Doe",
+  "username": "johndoe",
+  "email": "john@example.com",
+  "password": "securepassword123"
+}
+
+### 2. Verify email with OTP
+# @name verifyEmail
+POST {{baseUrl}}/auth/verify-email
+Content-Type: {{contentType}}
+
+{
+  "reference_id": "{{register.response.body.data.reference_id}}",
+  "otp": "123456"
+}
+
+### 3. Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "john@example.com",
+  "password": "securepassword123"
+}
+
+### 4. Refresh token
+# @name refreshTokenReq
+POST {{baseUrl}}/auth/refresh-token
+Content-Type: {{contentType}}
+
+{
+  "session_id": "PASTE_SESSION_ID_HERE",
+  "refresh_token": "PASTE_REFRESH_TOKEN_HERE"
+}
+
+### ──────────────────────────────
+### AUTH — Protected Routes
+### ──────────────────────────────
+
+### 5. Logout (requires auth)
+POST {{baseUrl}}/auth/logout
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+### ──────────────────────────────
+### USER — Protected Routes
+### ──────────────────────────────
+
+### 6. Get profile
+GET {{baseUrl}}/user/profile
+Authorization: Bearer {{accessToken}}
+
+### 7. Update profile
+PUT {{baseUrl}}/user/profile
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "John Updated",
+  "username": "johndoe2"
+}
+
+### 8. Update password
+PUT {{baseUrl}}/user/password
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "current_password": "securepassword123",
+  "new_password": "newsecurepassword456"
+}
+
+### 9. Request email update (sends OTP)
+POST {{baseUrl}}/user/update-email
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "new_email": "newemail@example.com"
+}
+
+### 10. Commit email update (verify OTP)
+POST {{baseUrl}}/user/commit-update-email
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "reference_id": "PASTE_REFERENCE_ID_HERE",
+  "otp": "123456"
+}
+
+### 11. Delete account
+DELETE {{baseUrl}}/user/account
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "current_password": "securepassword123"
+}

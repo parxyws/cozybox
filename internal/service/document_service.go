@@ -14,5 +14,6 @@ func NewDocumentService(db *gorm.DB) *DocumentService {
 }
 
 func (d *DocumentService) CreateDocument(req *dto.CreateDocumentRequest) (*dto.DocumentResponse, error) {
+	
 	return &dto.DocumentResponse{}, nil
 }

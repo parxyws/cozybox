@@ -6,11 +6,11 @@ import (
 )
 
 type User struct {
-	Id         string       `json:"id" gorm:"column:id"`
+	Id         string       `json:"id" gorm:"column:id;primaryKey"`
 	Name       string       `json:"name" gorm:"column:name"`
 	Username   string       `json:"username" gorm:"column:username"`
 	Email      string       `json:"email" gorm:"column:email"`
-	Password   string       `json:"password" gorm:"column:password"`
+	Password   string       `json:"-" gorm:"column:password"`
 	IsVerified bool         `json:"is_verified" gorm:"column:is_verified"`
 	LastLogin  time.Time    `json:"last_login" gorm:"column:last_login"`
 	CreatedAt  time.Time    `json:"created_at" gorm:"column:created_at"`

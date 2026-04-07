@@ -86,9 +86,6 @@ func (a *App) Initialize() error {
 		WriteTimeout: time.Duration(a.cfg.Server.WriteTimeout) * time.Second,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout*time.Second)
-	defer cancel()
-
 	if a.cfg.Server.SSL {
 		serverError := make(chan error)
 
@@ -103,6 +100,8 @@ func (a *App) Initialize() error {
 		case err := <-serverError:
 			log.Fatalf("server error: %s", err)
 		case <-quit:
+			ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout*time.Second)
+			defer cancel()
 			if err := srv.Shutdown(ctx); err != nil {
 				log.Fatalf("server shutdown error: %s", err)
 			}
@@ -124,6 +123,8 @@ func (a *App) Initialize() error {
 		case err := <-serverError:
 			log.Fatalf("Failed to start TLS server: %v", err)
 		case <-quit:
+			ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout*time.Second)
+			defer cancel()
 			if err := srv.Shutdown(ctx); err != nil {
 				log.Fatalf("Error gracefully shutting down server: %v", err)
 			}

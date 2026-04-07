@@ -4,6 +4,7 @@ package models
 // per organization and document type.
 type DocumentSequence struct {
 	Id             string       `json:"id" gorm:"column:id;primaryKey"`
+	TenantId       string       `json:"tenant_id" gorm:"column:tenant_id;index"`
 	OrganizationId string       `json:"organization_id" gorm:"column:organization_id"`
 	Type           DocumentType `json:"type" gorm:"column:type"`
 	Prefix         string       `json:"prefix" gorm:"column:prefix"`

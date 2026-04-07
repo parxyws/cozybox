@@ -13,6 +13,10 @@ func NewGoMailDialer(cfg *config.Config) *gomail.Dialer {
 	return gomail.NewDialer(cfg.Mail.Host, cfg.Mail.Port, cfg.Mail.User, cfg.Mail.Password)
 }
 
+func NewMailer(dialer *gomail.Dialer) *Mailer {
+	return &Mailer{dialer: dialer}
+}
+
 func (m *Mailer) SendOTP(to string, subject string, body string) error {
 	message := gomail.NewMessage()
 	message.SetHeader("From", "[EMAIL_ADDRESS]")

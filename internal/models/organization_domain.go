@@ -7,6 +7,7 @@ import (
 
 type Organization struct {
 	Id              string       `json:"id" gorm:"column:id;primaryKey"`
+	TenantId        string       `json:"tenant_id" gorm:"column:tenant_id;index"`
 	OwnerId         string       `json:"owner_id" gorm:"column:owner_id"`
 	Name            string       `json:"name" gorm:"column:name"`
 	Email           string       `json:"email" gorm:"column:email"`
@@ -25,6 +26,7 @@ type Organization struct {
 	DeletedAt       sql.NullTime `json:"deleted_at" gorm:"column:deleted_at"`
 
 	// Relations
+	Tenant   Tenant    `json:"tenant" gorm:"foreignKey:TenantId;references:Id"`
 	Owner    User      `json:"owner" gorm:"foreignKey:OwnerId;references:Id"`
 	Contacts []Contact `json:"contacts" gorm:"foreignKey:OrganizationId;references:Id"`
 }

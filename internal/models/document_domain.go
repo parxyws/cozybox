@@ -38,6 +38,7 @@ const (
 // quotation, invoice, receipt, purchase_order, sales_order, debit_note.
 type Document struct {
 	Id             string  `json:"id" gorm:"column:id;primaryKey"`
+	TenantId       string  `json:"tenant_id" gorm:"column:tenant_id;index"`
 	OrganizationId string  `json:"organization_id" gorm:"column:organization_id"`
 	ContactId      *string `json:"contact_id" gorm:"column:contact_id"`
 	ParentId       *string `json:"parent_id" gorm:"column:parent_id"`
@@ -78,6 +79,7 @@ type Document struct {
 	DeletedAt sql.NullTime `json:"deleted_at" gorm:"column:deleted_at"`
 
 	// Relations
+	Tenant       Tenant             `json:"tenant" gorm:"foreignKey:TenantId;references:Id"`
 	Organization Organization       `json:"organization" gorm:"foreignKey:OrganizationId;references:Id"`
 	Contact      *Contact           `json:"contact" gorm:"foreignKey:ContactId;references:Id"`
 	Parent       *Document          `json:"parent" gorm:"foreignKey:ParentId;references:Id"`

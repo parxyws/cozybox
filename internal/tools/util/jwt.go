@@ -14,7 +14,7 @@ const (
 )
 
 type TokenMaker interface {
-	CreateAccessToken(userID string, sessionID string, duration time.Duration) (string, error)
+	CreateAccessToken(userID string, tenantID string, sessionID string, duration time.Duration) (string, error)
 	VerifyAccessToken(token string) (*CustomClaims, error)
 	GenerateRefreshToken() (string, error)
 }
@@ -25,6 +25,7 @@ type JWTMaker struct {
 
 type CustomClaims struct {
 	UserID    string `json:"user_id"`
+	TenantID  string `json:"tenant_id"`
 	SessionID string `json:"session_id"`
 	jwt.RegisteredClaims
 }
@@ -38,9 +39,10 @@ func NewJWTMaker(secretKey string) (TokenMaker, error) {
 	}, nil
 }
 
-func (maker *JWTMaker) CreateAccessToken(userID string, sessionID string, duration time.Duration) (string, error) {
+func (maker *JWTMaker) CreateAccessToken(userID string, tenantID string, sessionID string, duration time.Duration) (string, error) {
 	claims := CustomClaims{
 		UserID:    userID,
+		TenantID:  tenantID,
 		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    ISS,

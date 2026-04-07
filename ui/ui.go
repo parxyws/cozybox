@@ -21,7 +21,7 @@ func AddRoutes(router gin.IRouter) {
 }
 
 // ----------------------------------------------------------------------
-// staticFileSystem serves files out of the embedded build folder
+// staticFileSystem serves files out of the embedded dist folder
 
 type staticFileSystem struct {
 	http.FileSystem
@@ -30,7 +30,7 @@ type staticFileSystem struct {
 var _ static.ServeFileSystem = (*staticFileSystem)(nil)
 
 func newStaticFileSystem() *staticFileSystem {
-	sub, err := fs.Sub(staticFS, "build")
+	sub, err := fs.Sub(staticFS, "dist")
 
 	if err != nil {
 		panic(err)
@@ -42,7 +42,7 @@ func newStaticFileSystem() *staticFileSystem {
 }
 
 func (s *staticFileSystem) Exists(prefix string, path string) bool {
-	buildpath := fmt.Sprintf("build%s", path)
+	buildpath := fmt.Sprintf("dist%s", path)
 
 	// support for folders
 	if strings.HasSuffix(path, "/") {

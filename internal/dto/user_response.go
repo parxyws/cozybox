@@ -16,10 +16,18 @@ type VerifyEmailResponse struct {
 }
 
 type UserAutheticateResponse struct {
-	AccessToken  string       `json:"access_token"`
-	RefreshToken string       `json:"refresh_token"`
-	TokenType    string       `json:"token_type"`
-	User         UserResponse `json:"user"`
+	AccessToken  string         `json:"access_token"`
+	RefreshToken string         `json:"refresh_token"`
+	TokenType    string         `json:"token_type"`
+	User         UserResponse   `json:"user"`
+	Tenant       TenantResponse `json:"tenant"`
+}
+
+type TenantResponse struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+	Role string `json:"role"`
 }
 
 type UpdateEmailResponse struct {
