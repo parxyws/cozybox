@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/parxyws/cozybox/internal/config"
@@ -17,6 +18,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize config: %v", err)
 	}
+	fmt.Println(cfg)
 
 	db, err := psql.InitPostgres(cfg)
 	if err != nil {

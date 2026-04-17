@@ -15,8 +15,7 @@ func InitPostgres(cfg *config.Config) (*gorm.DB, error) {
 	var err error
 
 	// Connect to Write (Source) Database
-	writeDsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=UTC",
-		cfg.WriteDB.Host, cfg.WriteDB.User, cfg.WriteDB.Password, cfg.WriteDB.NameDB, cfg.WriteDB.Port)
+	writeDsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.WriteDB.User, cfg.WriteDB.Password, cfg.WriteDB.Host, cfg.WriteDB.Port, cfg.WriteDB.NameDB)
 
 	db, err := gorm.Open(postgres.Open(writeDsn), &gorm.Config{})
 	if err != nil {
@@ -24,8 +23,7 @@ func InitPostgres(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	// Connect to Read (Replica) Database via DBResolver
-	readDsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=UTC",
-		cfg.ReadDB.Host, cfg.ReadDB.User, cfg.ReadDB.Password, cfg.ReadDB.NameDB, cfg.ReadDB.Port)
+	readDsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.ReadDB.User, cfg.ReadDB.Password, cfg.ReadDB.Host, cfg.ReadDB.Port, cfg.ReadDB.NameDB)
 
 	// Configure DBResolver Plugin
 	err = db.Use(

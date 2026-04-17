@@ -69,8 +69,10 @@ type Document struct {
 	// Type-specific extensible metadata stored as JSONB
 	Metadata json.RawMessage `json:"metadata" gorm:"column:metadata;type:jsonb;default:'{}'"`
 
-	// File storage
-	PdfUrl string `json:"pdf_url" gorm:"column:pdf_url"`
+	// File storage — store the S3/MinIO object key, generate presigned URLs at request time
+	PdfS3Key       string       `json:"pdf_s3_key" gorm:"column:pdf_s3_key"`
+	PdfGeneratedAt sql.NullTime `json:"pdf_generated_at" gorm:"column:pdf_generated_at"`
+	PdfSizeBytes   int          `json:"pdf_size_bytes" gorm:"column:pdf_size_bytes"`
 
 	// Audit
 	CreatedBy string       `json:"created_by" gorm:"column:created_by"`
